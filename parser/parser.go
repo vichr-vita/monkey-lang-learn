@@ -57,6 +57,8 @@ func NewParser(lexer *lexer.Lexer) *Parser {
 	p.registerInfix(token.GT, p.parseInfixExpression)
 	p.registerPrefix(token.IF, p.parseIfExpression)
 	p.registerPrefix(token.FUNCTION, p.parseFunctionLiteral)
+	// Allow '(' to start a grouped expression like `(1 + 2)`
+	p.registerPrefix(token.LPAREN, p.parseGroupedExpression)
 	p.registerInfix(token.LPAREN, p.parseCallExpression)
 
 	p.nextToken()
@@ -218,6 +220,15 @@ func (p *Parser) parseIfExpression() ast.Expression {
 	}
 
 	return expression
+}
+
+func (p *Parser) parseGroupedExpression() ast.Expression {
+	p.nextToken()
+	exp := p.parseExpression(LOWEST)
+	if !p.expectPeek(token.RPAREN) {
+		return nil
+	}
+	return exp
 }
 
 func (p *Parser) parseBlockStatement() *ast.BlockStatement {

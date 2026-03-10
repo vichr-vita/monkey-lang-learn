@@ -1,3 +1,4 @@
+// Package ast: defines the abstract syntax tree (AST) for the Monkey programming language.
 package ast
 
 import (

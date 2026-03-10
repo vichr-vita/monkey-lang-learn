@@ -1,3 +1,4 @@
+// Package evaluator implements the core of the Monkey interpreter: the Eval function, which takes an AST and an environment and produces an object. The Eval function is recursive, and it handles all the different types of AST nodes. The environment is a mapping from variable names to their values, and it is used to keep track of variable bindings. The Eval function also handles function application, which involves creating a new environment for the function's parameters and evaluating the function body in that environment.
 package evaluator
 
 import (
@@ -12,6 +13,10 @@ var (
 	FALSE = &object.Boolean{Value: false}
 	NULL  = &object.Null{}
 )
+
+func nativeToStringObject(input string) *object.String {
+	return &object.String{Value: input}
+}
 
 func nativeToBooleanObject(input bool) *object.Boolean {
 	if input {
@@ -37,6 +42,8 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 		return Eval(node.Expression, env)
 	case *ast.IntegerLiteral:
 		return &object.Integer{Value: node.Value}
+	case *ast.StringLiteral:
+		return &object.String{Value: node.Value}
 	case *ast.BooleanLiteral:
 		return nativeToBooleanObject(node.Value)
 	case *ast.Identifier:
@@ -82,8 +89,36 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 		if len(args) == 1 && isError(args[0]) {
 			return args[0]
 		}
+		return applyFunction(function, args)
 	}
 	return newError("unknown node type: %T", node)
+}
+
+func applyFunction(fn object.Object, args []object.Object) object.Object {
+	function, ok := fn.(*object.Function)
+	if !ok {
+		return newError("not a function %s", fn.Type())
+	}
+	extendedEnv := extendFunctionEnv(function, args)
+	evaluated := Eval(function.Body, extendedEnv)
+	return unwrapReturnValue(evaluated)
+}
+
+func extendFunctionEnv(function *object.Function, args []object.Object) *object.Environment {
+	env := object.NewEnclosedEnvironment(function.Env)
+
+	for paramIdx, param := range function.Parameters {
+		env.Set(param.Value, args[paramIdx])
+	}
+
+	return env
+}
+
+func unwrapReturnValue(obj object.Object) object.Object {
+	if returnValue, ok := obj.(*object.ReturnValue); ok {
+		return returnValue.Value
+	}
+	return obj
 }
 
 func evalExpressions(exps []ast.Expression, env *object.Environment) []object.Object {
@@ -169,10 +204,27 @@ func evalLetStatement(ls *ast.LetStatement, env *object.Environment) object.Obje
 func evalInfixExpression(operator string, left, right object.Object) object.Object {
 	if left.Type() == "INTEGER" && right.Type() == "INTEGER" {
 		return evalIntegerInfixExpression(operator, left, right)
+	} else if left.Type() == "STRING" && right.Type() == "STRING" {
+		return evalStringInfixExpression(operator, left, right)
 	} else if string(left.Type()) == "BOOLEAN" && string(right.Type()) == "BOOLEAN" {
 		return evalBooleanInfixExpression(operator, left, right)
 	} else {
 		return newError("type mismatch: %s %s %s", left.Type(), operator, right.Type())
+	}
+
+}
+
+func evalStringInfixExpression(operator string, left, right object.Object) object.Object {
+	leftVal := left.(*object.String).Value
+	rightVal := right.(*object.String).Value
+
+	switch operator {
+	case "+":
+		return nativeToStringObject(leftVal + rightVal)
+	case "==":
+		return nativeToBooleanObject(leftVal == rightVal)
+	default:
+		return newError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
 	}
 
 }

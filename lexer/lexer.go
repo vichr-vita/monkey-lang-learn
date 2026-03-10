@@ -1,3 +1,4 @@
+// Package lexer implements a lexer for the Monkey programming language. It takes in a string of source code and produces a stream of tokens that can be consumed by the parser.
 package lexer
 
 import "vichr.me/go/monkey-lang-interpreter/token"
@@ -90,6 +91,13 @@ func (l *Lexer) NextToken() token.Token {
 		tok = newToken(token.LBRACE, l.ch)
 	case '}':
 		tok = newToken(token.RBRACE, l.ch)
+	case '"':
+		s, encountered := l.readUntilEcnountered('"')
+		if !encountered {
+			tok = token.Token{Type: token.ILLEGAL, Literal: s}
+		} else {
+			tok = token.Token{Type: token.STRING, Literal: s}
+		}
 	case 0:
 		tok.Literal = ""
 		tok.Type = token.EOF
@@ -109,6 +117,20 @@ func (l *Lexer) NextToken() token.Token {
 
 	l.readChar()
 	return tok
+}
+
+// reads until the given character is encountered, returns the string read and whether the character was found
+// if eof reached, returns the string read and false
+func (l *Lexer) readUntilEcnountered(ch byte) (string, bool) {
+	l.readChar() // skip the opening character (e.g. the opening quote)
+	position := l.position
+	for l.ch != ch {
+		if l.ch == 0 {
+			return "", false
+		}
+		l.readChar()
+	}
+	return l.input[position:l.position], true
 }
 
 func (l *Lexer) readSatisfies(satisfies func(byte) bool) string {

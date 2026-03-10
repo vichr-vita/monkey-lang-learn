@@ -1,3 +1,4 @@
+// Package parser implements a recursive descent parser for the Monkey programming language. It takes a stream of tokens from the lexer and produces an abstract syntax tree (AST) that represents the structure of the program. The parser handles operator precedence, function literals, if expressions, and more. It also collects errors encountered during parsing for later reporting.
 package parser
 
 import (

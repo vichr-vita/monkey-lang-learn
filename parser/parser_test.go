@@ -4,6 +4,7 @@ package parser
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"vichr.me/go/monkey-lang-interpreter/ast"
 	"vichr.me/go/monkey-lang-interpreter/lexer"
@@ -74,6 +75,39 @@ func TestReturnStatements(t *testing.T) {
 
 }
 
+func TestLetStatementWithoutSemicolonDoesNotHang(t *testing.T) {
+	input := "let x = 5"
+	program, p := parseProgramWithTimeout(t, input)
+	checkParserErrors(t, p)
+
+	if len(program.Statements) != 1 {
+		t.Fatalf("program.Statements does not contain 1 statement. got=%d", len(program.Statements))
+	}
+
+	if !testLetStatement(t, program.Statements[0], "x") {
+		return
+	}
+}
+
+func TestReturnStatementWithoutSemicolonDoesNotHang(t *testing.T) {
+	input := "return 5"
+	program, p := parseProgramWithTimeout(t, input)
+	checkParserErrors(t, p)
+
+	if len(program.Statements) != 1 {
+		t.Fatalf("program.Statements does not contain 1 statement. got=%d", len(program.Statements))
+	}
+
+	returnStatement, ok := program.Statements[0].(*ast.ReturnStatement)
+	if !ok {
+		t.Fatalf("statement not *ast.ReturnStatement. got=%T", program.Statements[0])
+	}
+
+	if !testIntegerLiteral(t, returnStatement.ReturnValue, 5) {
+		return
+	}
+}
+
 func checkParserErrors(t *testing.T, p *Parser) {
 	errors := p.Errors()
 	if len(errors) == 0 {
@@ -85,6 +119,35 @@ func checkParserErrors(t *testing.T, p *Parser) {
 		t.Errorf("parser error: %q", msg)
 	}
 	t.FailNow()
+}
+
+func parseProgramWithTimeout(t *testing.T, input string) (*ast.Program, *Parser) {
+	t.Helper()
+
+	resultCh := make(chan struct {
+		program *ast.Program
+		parser  *Parser
+	}, 1)
+
+	go func() {
+		l := lexer.NewLexer(input)
+		p := NewParser(l)
+		resultCh <- struct {
+			program *ast.Program
+			parser  *Parser
+		}{
+			program: p.ParseProgram(),
+			parser:  p,
+		}
+	}()
+
+	select {
+	case result := <-resultCh:
+		return result.program, result.parser
+	case <-time.After(100 * time.Millisecond):
+		t.Fatalf("ParseProgram() timed out for input %q", input)
+		return nil, nil
+	}
 }
 
 func testLetStatement(t *testing.T, s ast.Statement, name string) bool {

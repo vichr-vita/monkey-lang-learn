@@ -1,3 +1,4 @@
+// Package token defines the Token struct and related constants for a lexer/parser in a programming language. It includes token types for identifiers, literals, operators, delimiters, and keywords. The LookupIdent function checks if a given identifier is a keyword and returns the appropriate token type.
 package token
 
 type TokenType string

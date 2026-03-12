@@ -1,6 +1,10 @@
 package evaluator
 
-import "vichr.me/go/monkey-lang-interpreter/object"
+import (
+	"fmt"
+
+	"vichr.me/go/monkey-lang-interpreter/object"
+)
 
 var builtins = map[string]*object.Builtin{
 	"len": {
@@ -89,6 +93,15 @@ var builtins = map[string]*object.Builtin{
 			copy(newElements, arr.Elements)
 			newElements[length] = args[1]
 			return &object.Array{Elements: newElements}
+		},
+	},
+	"puts": {
+		Fn: func(args ...object.Object) object.Object {
+			for _, arg := range args {
+				fmt.Print(arg.Inspect())
+			}
+			fmt.Println()
+			return NULL
 		},
 	},
 }

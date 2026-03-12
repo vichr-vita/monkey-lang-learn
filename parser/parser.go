@@ -62,6 +62,7 @@ func NewParser(lexer *lexer.Lexer) *Parser {
 	p.registerInfix(token.LBRACKET, p.parseIndexExpression)
 	p.registerPrefix(token.IF, p.parseIfExpression)
 	p.registerPrefix(token.FUNCTION, p.parseFunctionLiteral)
+	p.registerPrefix(token.LBRACE, p.parseHashLiteral)
 	// Allow '(' to start a grouped expression like `(1 + 2)`
 	p.registerPrefix(token.LPAREN, p.parseGroupedExpression)
 	p.registerInfix(token.LPAREN, p.parseCallExpression)
@@ -161,13 +162,13 @@ func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
 func (p *Parser) parseLetStatement() *ast.LetStatement {
 	stmt := &ast.LetStatement{Token: p.curToken}
 
-	if !p.expectPeek(token.IDENT) {
+	if !p.expectPeekType(token.IDENT) {
 		return nil
 	}
 
 	stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 
-	if !p.expectPeek(token.ASSIGN) {
+	if !p.expectPeekType(token.ASSIGN) {
 		return nil
 	}
 
@@ -196,7 +197,7 @@ func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
 func (p *Parser) parseIfExpression() ast.Expression {
 	expression := &ast.IfExpression{Token: p.curToken}
 
-	if !p.expectPeek(token.LPAREN) {
+	if !p.expectPeekType(token.LPAREN) {
 		return nil
 	}
 
@@ -204,11 +205,11 @@ func (p *Parser) parseIfExpression() ast.Expression {
 
 	expression.Condition = p.parseExpression(LOWEST)
 
-	if !p.expectPeek(token.RPAREN) {
+	if !p.expectPeekType(token.RPAREN) {
 		return nil
 	}
 
-	if !p.expectPeek(token.LBRACE) {
+	if !p.expectPeekType(token.LBRACE) {
 		return nil
 	}
 
@@ -217,7 +218,7 @@ func (p *Parser) parseIfExpression() ast.Expression {
 	if p.peekTokenIsType(token.ELSE) {
 		p.nextToken()
 
-		if !p.expectPeek(token.LBRACE) {
+		if !p.expectPeekType(token.LBRACE) {
 			return nil
 		}
 
@@ -230,7 +231,7 @@ func (p *Parser) parseIfExpression() ast.Expression {
 func (p *Parser) parseGroupedExpression() ast.Expression {
 	p.nextToken()
 	exp := p.parseExpression(LOWEST)
-	if !p.expectPeek(token.RPAREN) {
+	if !p.expectPeekType(token.RPAREN) {
 		return nil
 	}
 	return exp
@@ -319,7 +320,7 @@ func (p *Parser) peekTokenIsType(t token.TokenType) bool {
 	return p.peekToken.Type == t
 }
 
-func (p *Parser) expectPeek(t token.TokenType) bool {
+func (p *Parser) expectPeekType(t token.TokenType) bool {
 	if p.peekTokenIsType(t) {
 		p.nextToken()
 		return true
@@ -355,13 +356,13 @@ func (p *Parser) parseBooleanLiteral() ast.Expression {
 func (p *Parser) parseFunctionLiteral() ast.Expression {
 	lit := &ast.FunctionLiteral{Token: p.curToken}
 
-	if !p.expectPeek(token.LPAREN) {
+	if !p.expectPeekType(token.LPAREN) {
 		return nil
 	}
 
 	lit.Parameters = p.parseFunctionParameters()
 
-	if !p.expectPeek(token.LBRACE) {
+	if !p.expectPeekType(token.LBRACE) {
 		return nil
 	}
 
@@ -390,7 +391,7 @@ func (p *Parser) parseFunctionParameters() []*ast.Identifier {
 		identifiers = append(identifiers, ident)
 	}
 
-	if !p.expectPeek(token.RPAREN) {
+	if !p.expectPeekType(token.RPAREN) {
 		return nil
 	}
 
@@ -428,7 +429,7 @@ func (p *Parser) parseExpressionList(end token.TokenType) []ast.Expression {
 		list = append(list, p.parseExpression(LOWEST))
 	}
 
-	if !p.expectPeek(end) { // Expect the closing token (e.g., ']')
+	if !p.expectPeekType(end) { // Expect the closing token (e.g., ']')
 		return nil
 	}
 
@@ -441,9 +442,37 @@ func (p *Parser) parseIndexExpression(left ast.Expression) ast.Expression {
 	p.nextToken()
 	exp.Index = p.parseExpression(LOWEST)
 
-	if !p.expectPeek(token.RBRACKET) {
+	if !p.expectPeekType(token.RBRACKET) {
 		return nil
 	}
 
 	return exp
+}
+
+func (p *Parser) parseHashLiteral() ast.Expression {
+	hash := &ast.HashLiteral{Token: p.curToken}
+	hash.Pairs = make(map[ast.Expression]ast.Expression)
+
+	for !p.peekTokenIsType(token.RBRACE) {
+		p.nextToken()
+		key := p.parseExpression(LOWEST)
+		if !p.expectPeekType(token.COLON) {
+			return nil
+		}
+
+		p.nextToken()
+		value := p.parseExpression(LOWEST)
+		hash.Pairs[key] = value
+
+		if !p.peekTokenIsType(token.RBRACE) && !p.expectPeekType(token.COMMA) {
+			return nil
+		}
+	}
+
+	if !p.expectPeekType(token.RBRACE) {
+		return nil
+	}
+
+	return hash
+
 }

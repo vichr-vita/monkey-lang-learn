@@ -1,3 +1,4 @@
+// Package object defines the various object types that can be used in the Monkey programming language interpreter.
 package object
 
 import (
